@@ -1,10 +1,23 @@
 
 -- Global state
-
+Player = {
+        io.write("Please Enter Your Name:\n"),
+        name = io.read(),
+        hp = 10,
+        maxhp = 10,
+        mana = 3,
+        maxmana = 6,
+}
+Enemy = {
+        name = "CPU",
+        hp = 10,
+        maxHp = 10,
+        mana = 0,
+        maxmana = 6,
+}
 local deck        = {}
 local playerHand  = {}
 local discard     = {}
-
 
 local currentCard    = nil
 local currentInstant = nil
@@ -120,39 +133,39 @@ end
 
 local function applyCardEffect(card, isInstant)
     if card.type == "attack" or (isInstant and card.type == "instant" and card.attack > 0) then
-        enemy.hp = clamp(enemy.hp - card.attack, 0, enemy.maxHp)
+        Enemy.hp = clamp(Enemy.hp - card.attack, 0, Enemy.maxHp)
         showMessage(card.name .. " deals " .. card.attack .. " damage!")
     end
 
     if card.type == "defense" or (isInstant and card.type == "instant" and card.defense > 0) then
         -- Simple defense: reduce enemy's next attack
-        player.hp = clamp(player.hp + math.floor(card.defense / 3), 0, player.maxHp)
+        Player.hp = clamp(Player.hp + math.floor(card.defense / 3), 0, Player.maxHp)
         showMessage(card.name .. " blocks — +" .. math.floor(card.defense / 3) .. " HP shielded.")
     end
 
     if card.type == "heal" and card.heal then
-        player.hp = clamp(player.hp + card.heal, 0, player.maxHp)
+        Player.hp = clamp(Player.hp + card.heal, 0, Player.maxHp)
         showMessage(card.name .. " restores " .. card.heal .. " HP.")
     end
 end
 
 local function enemyAttack()
     local dmg = love.math.random(4, 8)
-    player.hp = clamp(player.hp - dmg, 0, player.maxHp)
-    showMessage(enemy.name .. " attacks for " .. dmg .. " damage!", 1.5)
+    Player.hp = clamp(Player.hp - dmg, 0, Player.maxHp)
+    showMessage(Enemy.name .. " attacks for " .. dmg .. " damage!", 1.5)
 end
 
 
 -- Win / loss check
 
 local function checkEndConditions()
-    if enemy.hp <= 0 then
+    if Enemy.hp <= 0 then
         victory = true
         gameOver = true
-        showMessage("Victory! The " .. enemy.name .. " is defeated!", 999)
+        showMessage("Victory! The " .. Enemy.name .. " is defeated!", 999)
         return true
     end
-    if player.hp <= 0 then
+    if Player.hp <= 0 then
         victory  = false
         gameOver = true
         showMessage("Defeat! You have fallen...", 999)
@@ -201,7 +214,7 @@ function love.update(dt)
             phaseTimer = 0
             drawUpTo(4)
             -- Refill mana each turn
-            player.mana = player.maxMana
+            Player.mana = Player.maxMana
             phase = "player"
             showMessage("Your turn — click a card to play it.", 3)
         end
@@ -258,12 +271,12 @@ function love.mousepressed(x, y, button)
         local cy = HAND_Y
         if x >= cx and x <= cx + CARD_W and y >= cy and y <= cy + CARD_H then
             -- Check mana cost
-            if player.mana < card.cost then
+            if Player.mana < card.cost then
                 showMessage("Not enough mana for " .. card.name .. "!", 1.5)
                 return
             end
             -- Play the card
-            player.mana  = player.mana - card.cost
+            Player.mana  = Player.mana - card.cost
             currentCard  = removeFromHand(i)
             applyCardEffect(currentCard, false)
             if not checkEndConditions() then
@@ -351,13 +364,13 @@ end
 local function drawBar(x, y, w, h, current, max, r, g, b)
     love.graphics.setColor(0.2, 0.2, 0.2)
     love.graphics.rectangle("fill", x, y, w, h, 3, 3)
-    local ratio = clamp(current / max, 0, 1)
+    local ratio = clamp(current / Player.maxhp, 0, 1)
     love.graphics.setColor(r, g, b)
     love.graphics.rectangle("fill", x, y, w * ratio, h, 3, 3)
     love.graphics.setColor(0.6, 0.6, 0.6)
     love.graphics.rectangle("line", x, y, w, h, 3, 3)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf(current .. "/" .. max, x, y, w, "center")
+    love.graphics.printf(current .. "/" .. Player.maxhp, x, y, w, "center")
 end
 
 
@@ -378,19 +391,19 @@ function love.draw()
     love.graphics.setColor(0.65, 0.15, 0.15)
     love.graphics.rectangle("fill", W/2 - 120, 40, 240, 70, 8, 8)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf(enemy.name, W/2 - 120, 48, 240, "center")
-    drawBar(W/2 - 100, 68, 200, 18, enemy.hp, enemy.maxHp, 0.85, 0.15, 0.15)
+    love.graphics.printf(Enemy.name, W/2 - 120, 48, 240, "center")
+    drawBar(W/2 - 100, 68, 200, 18, Enemy.hp, Enemy.maxhp, 0.85, 0.15, 0.15)
 
     -- ── Player panel ──
     love.graphics.setColor(0.15, 0.35, 0.55)
     love.graphics.rectangle("fill", 20, 350, 200, 70, 8, 8)
     love.graphics.setColor(1, 1, 1)
     love.graphics.print("Player", 30, 358)
-    drawBar(30, 375, 180, 16, player.hp, player.maxHp, 0.20, 0.75, 0.25)
+    drawBar(30, 375, 180, 16, Player.hp, Player.maxhp, 0.20, 0.75, 0.25)
 
     -- Mana
     love.graphics.setColor(0.4, 0.4, 1)
-    love.graphics.print("Mana: " .. player.mana .. "/" .. player.maxMana, 30, 396)
+    love.graphics.print("Mana: " .. Player.mana .. "/" .. Player.maxmana, 30, 396)
 
     -- ── Deck / discard counters ──
     love.graphics.setColor(0.7, 0.7, 0.7)
@@ -433,5 +446,6 @@ function love.draw()
         love.graphics.printf(txt, 0, 200, W, "center")
         love.graphics.setColor(0.8, 0.8, 0.8)
         love.graphics.printf("Press R to restart  |  ESC to quit", 0, 250, W, "center")
+   
     end
 end
