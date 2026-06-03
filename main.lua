@@ -1,8 +1,7 @@
 
 -- Global state
 Player = {
-        io.write("Please Enter Your Name:\n"),
-        name = io.read(),
+        name = "Hero",
         hp = 10,
         maxhp = 10,
         mana = 3,
@@ -11,7 +10,7 @@ Player = {
 Enemy = {
         name = "CPU",
         hp = 10,
-        maxHp = 10,
+        maxhp = 10,
         mana = 0,
         maxmana = 6,
 }
@@ -64,11 +63,11 @@ end
 -- Card definitions (to be swapped for JSON)
 
 local CARD_DEFS = {
-    { id="sword",    name="Sword",     type="attack",  attack=8,  defense=0,  cost=1,
+    { id="sword",    name="Sword",     type="attack",  attack=1,  defense=0,  cost=1,
       description="A reliable blade." },
-    { id="fireball", name="Fireball",  type="attack",  attack=15, defense=0,  cost=2,
+    { id="fireball", name="Fireball",  type="attack",  attack=3, defense=0,  cost=2,
       description="Burns the enemy." },
-    { id="shield",   name="Shield",    type="defense", attack=0,  defense=10, cost=1,
+    { id="shield",   name="Shield",    type="defense", attack=0,  defense=3, cost=1,
       description="Absorbs damage." },
 }
 
@@ -133,25 +132,25 @@ end
 
 local function applyCardEffect(card, isInstant)
     if card.type == "attack" or (isInstant and card.type == "instant" and card.attack > 0) then
-        Enemy.hp = clamp(Enemy.hp - card.attack, 0, Enemy.maxHp)
+        Enemy.hp = clamp(Enemy.hp - card.attack, 0, Enemy.maxhp)
         showMessage(card.name .. " deals " .. card.attack .. " damage!")
     end
 
     if card.type == "defense" or (isInstant and card.type == "instant" and card.defense > 0) then
         -- Simple defense: reduce enemy's next attack
-        Player.hp = clamp(Player.hp + math.floor(card.defense / 3), 0, Player.maxHp)
+        Player.hp = clamp(Player.hp + math.floor(card.defense / 3), 0, Player.maxhp)
         showMessage(card.name .. " blocks — +" .. math.floor(card.defense / 3) .. " HP shielded.")
     end
 
     if card.type == "heal" and card.heal then
-        Player.hp = clamp(Player.hp + card.heal, 0, Player.maxHp)
+        Player.hp = clamp(Player.hp + card.heal, 0, Player.maxhp)
         showMessage(card.name .. " restores " .. card.heal .. " HP.")
     end
 end
 
 local function enemyAttack()
     local dmg = love.math.random(4, 8)
-    Player.hp = clamp(Player.hp - dmg, 0, Player.maxHp)
+    Player.hp = clamp(Player.hp - dmg, 0, Player.maxhp)
     showMessage(Enemy.name .. " attacks for " .. dmg .. " damage!", 1.5)
 end
 
@@ -214,7 +213,7 @@ function love.update(dt)
             phaseTimer = 0
             drawUpTo(4)
             -- Refill mana each turn
-            Player.mana = Player.maxMana
+            Player.mana = Player.maxmana
             phase = "player"
             showMessage("Your turn — click a card to play it.", 3)
         end
