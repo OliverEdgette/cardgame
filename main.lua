@@ -5,7 +5,7 @@ Player = {
         hp = 10,
         maxhp = 10,
         mana = 3,
-        maxmana = 6,
+        maxmana = 4,
 }
 Enemy = {
         name = "CPU",
@@ -38,7 +38,9 @@ local selectedIdx = nil       -- index in playerHand the player clicked
 -- Card dimensions for UI
 local CARD_W, CARD_H = 90, 130
 local HAND_Y         = 430    -- y position of the hand row
-
+-- button dimensions
+local BTN_X, BTN_Y   = 490, 460
+local BTN_W, BTN_H   = 130, 50
 
 --Utility functions 
 
@@ -62,14 +64,50 @@ end
 
 -- Card definitions (to be swapped for JSON)
 
-local CARD_DEFS = {
-    { id="sword",    name="Sword",     type="attack",  attack=1,  defense=0,  cost=1,
-      description="A reliable blade." },
-    { id="fireball", name="Fireball",  type="attack",  attack=3, defense=0,  cost=2,
-      description="Burns the enemy." },
-    { id="shield",   name="Shield",    type="defense", attack=0,  defense=3, cost=1,
-      description="Absorbs damage." },
-}
+local json      = require("dkjson")
+local CARD_DEFS = {}
+
+local function loadCardDefs(path)
+    -- Check the file exists and is visible to LÖVE's filesystem
+    local info = love.filesystem.getInfo(path)
+    if not info then
+        error("File not found: '" .. path .. "'\nReal path: " .. love.filesystem.getSource())
+    end
+
+    local contents, err = love.filesystem.read(path)
+    if not contents then
+        error("Read failed: " .. tostring(err))
+    end
+
+    -- Print the raw first 60 bytes so we can see exactly what dkjson receives
+    print("File size:", #contents)
+    print("First 60 chars: [" .. contents:sub(1, 60) .. "]")
+    print("First 3 bytes (hex):")
+    for i = 1, math.min(3, #contents) do
+        io.write(string.format("0x%02X ", contents:byte(i)))
+    end
+    print()
+
+    -- Strip BOM if present
+    if contents:sub(1, 3) == "\xEF\xBB\xBF" then
+        print("BOM detected and stripped.")
+        contents = contents:sub(4)
+    end
+
+    local data, pos, jsonErr = json.decode(contents, 1, nil)
+    if not data then
+        error("JSON parse error at position " .. tostring(pos) .. ": " .. tostring(jsonErr))
+    end
+    if not data.cards then
+        error("JSON parsed OK but has no 'cards' key. Keys found: " ..
+            (function()
+                local ks = {}
+                for k in pairs(data) do table.insert(ks, tostring(k)) end
+                return table.concat(ks, ", ")
+            end)())
+    end
+    return data.cards
+end
 
 --- Build a fresh copy of a card from its definition
 local function newCard(def)
@@ -131,25 +169,39 @@ end
 -- Combat helpers 
 
 local function applyCardEffect(card, isInstant)
+    -- Temporary debug: remove once confirmed working
+    print("applyCardEffect called:")
+    for k, v in pairs(card) do
+        print("  " .. tostring(k) .. " = " .. tostring(v))
+    end
+    -- temp
     if card.type == "attack" or (isInstant and card.type == "instant" and card.attack > 0) then
         Enemy.hp = clamp(Enemy.hp - card.attack, 0, Enemy.maxhp)
         showMessage(card.name .. " deals " .. card.attack .. " damage!")
     end
-
     if card.type == "defense" or (isInstant and card.type == "instant" and card.defense > 0) then
-        -- Simple defense: reduce enemy's next attack
         Player.hp = clamp(Player.hp + math.floor(card.defense / 3), 0, Player.maxhp)
         showMessage(card.name .. " blocks — +" .. math.floor(card.defense / 3) .. " HP shielded.")
     end
-
     if card.type == "heal" and card.heal then
         Player.hp = clamp(Player.hp + card.heal, 0, Player.maxhp)
         showMessage(card.name .. " restores " .. card.heal .. " HP.")
     end
+    if card.type == "mana" and card.mana then
+        Player.mana = clamp(Player.mana + card.mana, 0, Player.maxmana)
+        showMessage(card.name .. " restores " .. card.mana .. " mana!")
+    end
+    if card.type == "lifesteal" then
+        local dmg   = card.attack or 0
+        local steal = card.steal  or dmg
+        Enemy.hp  = clamp(Enemy.hp  - dmg,   0, Enemy.maxhp)
+        Player.hp = clamp(Player.hp + steal, 0, Player.maxhp)
+        showMessage(card.name .. " steals " .. steal .. " HP from " .. Enemy.name .. "!")
+    end
 end
 
 local function enemyAttack()
-    local dmg = love.math.random(4, 8)
+    local dmg = love.math.random(1, 3)
     Player.hp = clamp(Player.hp - dmg, 0, Player.maxhp)
     showMessage(Enemy.name .. " attacks for " .. dmg .. " damage!", 1.5)
 end
@@ -182,6 +234,8 @@ function love.load()
 
     math.randomseed(os.time())
 
+    CARD_DEFS   = loadCardDefs("cards.json")
+
     deck        = buildDeck()
     playerHand  = {}
     discard     = {}
@@ -212,8 +266,6 @@ function love.update(dt)
         if phaseTimer >= PHASE_DELAY then
             phaseTimer = 0
             drawUpTo(4)
-            -- Refill mana each turn
-            Player.mana = Player.maxmana
             phase = "player"
             showMessage("Your turn — click a card to play it.", 3)
         end
@@ -264,24 +316,28 @@ function love.mousepressed(x, y, button)
     if gameOver or button ~= 1 then return end
     if phase ~= "player" then return end
 
+    -- End Turn button
+    if x >= BTN_X and x <= BTN_X + BTN_W and
+       y >= BTN_Y and y <= BTN_Y + BTN_H then
+        phase      = "instant"
+        phaseTimer = 0
+        showMessage("Turn ended.", 1)
+        return
+    end
     -- Detect which card in hand was clicked
     for i, card in ipairs(playerHand) do
         local cx = 20 + (i - 1) * (CARD_W + 10)
         local cy = HAND_Y
         if x >= cx and x <= cx + CARD_W and y >= cy and y <= cy + CARD_H then
-            -- Check mana cost
             if Player.mana < card.cost then
                 showMessage("Not enough mana for " .. card.name .. "!", 1.5)
                 return
             end
-            -- Play the card
-            Player.mana  = Player.mana - card.cost
-            currentCard  = removeFromHand(i)
+            Player.mana = Player.mana - card.cost
+            currentCard = removeFromHand(i)
             applyCardEffect(currentCard, false)
-            if not checkEndConditions() then
-                phase      = "instant"
-                phaseTimer = 0
-            end
+            -- Removed the showMessage("Card played...") that was overwriting effect messages
+            checkEndConditions()
             return
         end
     end
@@ -307,6 +363,8 @@ local function drawCardUI(card, x, y, highlight)
         defense = {0.10, 0.30, 0.55},
         heal    = {0.15, 0.50, 0.20},
         instant = {0.50, 0.35, 0.05},
+        mana    = {0.20, 0.20, 0.70},
+        lifesteal = {0.40, 0.10, 0.45},
     }
     local col = bg[card.type] or {0.25, 0.25, 0.25}
 
@@ -352,6 +410,16 @@ local function drawCardUI(card, x, y, highlight)
         love.graphics.print("HEAL " .. card.heal, x + 4, y + CARD_H - 22)
     end
 
+    if card.mana and card.mana > 0 then
+    love.graphics.setColor(0.5, 0.5, 1)
+    love.graphics.print("MANA +" .. card.mana, x + 4, y + CARD_H - 22)
+    end
+
+    if card.steal and card.steal > 0 then
+    love.graphics.setColor(0.85, 0.4, 1)
+    love.graphics.print("STEAL " .. card.steal, x + 4, y + CARD_H - 10)
+    end
+
     -- Mana cost bubble (top-right)
     love.graphics.setColor(0.3, 0.3, 0.8)
     love.graphics.circle("fill", x + CARD_W - 12, y + 12, 10)
@@ -363,13 +431,13 @@ end
 local function drawBar(x, y, w, h, current, max, r, g, b)
     love.graphics.setColor(0.2, 0.2, 0.2)
     love.graphics.rectangle("fill", x, y, w, h, 3, 3)
-    local ratio = clamp(current / Player.maxhp, 0, 1)
+    local ratio = clamp(current / max, 0, 1)
     love.graphics.setColor(r, g, b)
     love.graphics.rectangle("fill", x, y, w * ratio, h, 3, 3)
     love.graphics.setColor(0.6, 0.6, 0.6)
     love.graphics.rectangle("line", x, y, w, h, 3, 3)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf(current .. "/" .. Player.maxhp, x, y, w, "center")
+    love.graphics.printf(current .. "/" .. max, x, y, w, "center")
 end
 
 
@@ -401,8 +469,9 @@ function love.draw()
     drawBar(30, 375, 180, 16, Player.hp, Player.maxhp, 0.20, 0.75, 0.25)
 
     -- Mana
-    love.graphics.setColor(0.4, 0.4, 1)
-    love.graphics.print("Mana: " .. Player.mana .. "/" .. Player.maxmana, 30, 396)
+    love.graphics.setColor(0.6, 0.6, 1)
+    love.graphics.print("Mana", 30, 396)
+    drawBar(30, 410, 180, 14, Player.mana, Player.maxmana, 0.25, 0.25, 0.90)
 
     -- ── Deck / discard counters ──
     love.graphics.setColor(0.7, 0.7, 0.7)
@@ -425,6 +494,20 @@ function love.draw()
         -- Lift card on hover
         local drawY = hover and cy - 10 or cy
         drawCardUI(card, cx, drawY, hover)
+    end
+
+    -- ── End Turn Button ──
+    if not gameOver and phase == "player" then
+        local mx, my = love.mouse.getPosition()
+        local hover  = mx >= BTN_X and mx <= BTN_X + BTN_W
+                    and my >= BTN_Y and my <= BTN_Y + BTN_H
+        love.graphics.setColor(hover and {0.25, 0.65, 0.25} or {0.15, 0.45, 0.15})
+        love.graphics.rectangle("fill", BTN_X, BTN_Y, BTN_W, BTN_H, 8, 8)
+        love.graphics.setColor(hover and {0.5, 1, 0.5} or {0.4, 0.8, 0.4})
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", BTN_X, BTN_Y, BTN_W, BTN_H, 8, 8)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.printf("End Turn\n[E]", BTN_X, BTN_Y + 12, BTN_W, "center")
     end
 
     -- ── Message overlay ──

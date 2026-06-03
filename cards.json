@@ -1,0 +1,67 @@
+{
+  "cards": [
+    {
+      "id":          "sword",
+      "name":        "Sword",
+      "type":        "attack",
+      "attack":      1,
+      "defense":     0,
+      "cost":        0,
+      "copies":      2,
+      "description": "A reliable blade."
+    },
+    {
+      "id":          "fireball",
+      "name":        "Fireball",
+      "type":        "attack",
+      "attack":      3,
+      "defense":     0,
+      "cost":        3,
+      "copies":      2,
+      "description": "Burns the enemy."
+    },
+    {
+      "id":          "shield",
+      "name":        "Shield",
+      "type":        "defense",
+      "attack":      0,
+      "defense":     3,
+      "cost":        0,
+      "copies":      2,
+      "description": "Absorbs damage."
+    },
+    {
+      "id":         "healpotion",
+      "name":       "Minor Potion of Healing",
+      "type":       "heal",
+      "attack":      0,
+      "defense":     0,
+      "heal":        2,
+      "cost":        0,
+      "copies":      2,
+      "description": "Restores a small amount of health."
+    },
+    {
+      "id":         "manapotion_small",
+      "name":        "Minor Potion of Mana",
+      "type":        "mana",
+      "attack":      0,
+      "defense":     0,
+      "mana":        1,
+      "cost":        0,
+      "copies":      2,
+      "description": "Restores a small amount of mana."
+    },
+    {
+      "id":         "stealhealth_dagger",
+      "name":        "Vampire's Dagger",
+      "type":        "lifesteal",
+      "attack":      2,
+      "steal":       2,
+      "defense":     0,
+      "cost":        1,
+      "copies":      1,
+      "description": "A dagger that absorbs its enemy's strength. Steal 2hp."
+    }
+  ]
+}
