@@ -201,7 +201,7 @@ local function applyCardEffect(card, isInstant)
 end
 
 local function enemyAttack()
-    local dmg = love.math.random(1, 3)
+    local dmg = love.math.random(1, 6)
     Player.hp = clamp(Player.hp - dmg, 0, Player.maxhp)
     showMessage(Enemy.name .. " attacks for " .. dmg .. " damage!", 1.5)
 end
